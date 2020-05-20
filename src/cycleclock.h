@@ -50,6 +50,17 @@ extern "C" uint64_t __rdtsc();
 #include <emscripten.h>
 #endif
 
+#ifdef __ve
+// NEC SX-Aurora TSUBASA
+#include <libsysve.h>
+static inline double ve_get_resolution() {
+  char buf[32];
+  if (ve_get_ve_info((char*)"clock_base", buf, 32) == ssize_t(-1))
+    abort();
+  return atof(buf) * 1e6;
+}
+#endif
+
 namespace benchmark {
 // NOTE: only i386 and x86_64 have been well tested.
 // PPC, sparc, alpha, and ia64 are based on
@@ -193,6 +204,13 @@ inline BENCHMARK_ALWAYS_INLINE int64_t Now() {
   asm volatile("rdcycle %0" : "=r"(cycles));
   return cycles;
 #endif
+#elif defined (__ve)
+  // NEC SX-Aurora TSUBASA
+  // This reads the real time clock on the VE
+  uint64_t  ret;
+  void *vehva = ((void *)0x000000001000);
+  asm volatile("lhm.l %0,0(%1)":"=r"(ret):"r"(vehva));
+  return ((uint64_t)1000 * ret) / ve_get_resolution();
 #else
 // The soft failover to a generic implementation is automatic only for ARM.
 // For other platforms the developer is expected to make an attempt to create
